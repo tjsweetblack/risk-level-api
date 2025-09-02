@@ -39,11 +39,4 @@ app.post('/analyze-risk', upload.single('image'), async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
-
 module.exports = app;

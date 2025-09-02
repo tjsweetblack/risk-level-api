@@ -7,39 +7,43 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-app.post('/analyze-image', upload.single('image'), async (req, res) => {
-  console.log('Received POST /analyze-image');
-  if (!req.file) {ss
+app.post('/analyze-risk', upload.single('image'), async (req, res) => {
+  console.log('Received POST /analyze-risk');
+  if (!req.file) {
     return res.status(400).json({ error: 'No image uploaded' });
+  }
+  const { title, description } = req.body;
+  if (!title || !description) {
+    return res.status(400).json({ error: 'Missing title or description' });
   }
   try {
     const imageBytes = req.file.buffer;
-    const prompt = `Analyze this image to detect potential mosquito breeding sites. Consider the presence of any of the following: 
-- Stagnant water (puddles, pools, containers)
-- Vegetation capable of holding water (e.g., dense grass, bromeliads)
-- Discarded containers (tires, bottles, cans, flowerpots)
-- Accumulated trash or debris
-- Gutters or drainage systems
-- Any other area where water may collect and remain for more than 4 days.
-Respond with 'valid' if the image clearly shows one or more of these conditions, and 'invalid' if none are clearly present. Focus on the presence of standing water and items/areas that can hold water.`;
+    const prompt = `Analyze the image and report to assess the risk level of mosquito breeding, taking into account the following title: '${title}' and description: '${description}'. Rate the risk level on a scale of 1 to 3, where 1 is low risk, 2 is medium risk, and 3 is high risk. Respond with only a single number (1, 2, or 3) indicating the risk level.`;
 
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
-
-    // Correct way to format content for the Node.js SDK
     const content = [
       { text: prompt },
       { inlineData: { mimeType: 'image/jpeg', data: imageBytes.toString('base64') } }
     ];
-    
     const result = await model.generateContent({ contents: [{ role: 'user', parts: content }] });
-    const output = result.response.text().toLowerCase().trim();
-    console.log('Gemini image analysis response:', output);
-
-    res.json({ result: output });
+    const output = result.response.text().trim();
+    const riskLevel = parseInt(output, 10);
+    if ([1, 2, 3].includes(riskLevel)) {
+      res.json({ riskLevel });
+    } else {
+      res.status(200).json({ riskLevel: 1, warning: 'AI did not return a valid number, defaulted to 1', aiResponse: output });
+    }
   } catch (e) {
-    console.error('Error in /analyze-image:', e);
-    res.status(500).json({ error: 'Erro ao analisar a imagem: ' + e.message });
+    console.error('Error in /analyze-risk:', e);
+    res.status(500).json({ error: 'Erro ao analisar o risco: ' + e.message });
   }
 });
+
+const PORT = process.env.PORT || 3000;
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
 
 module.exports = app;
